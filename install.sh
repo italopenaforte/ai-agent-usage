@@ -1,14 +1,14 @@
 #!/bin/bash
-# install.sh — Install ia-agent-usage and configure Claude Code statusline hook
+# install.sh — Install ai-agent-usage and configure Claude Code statusline hook
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="${HOME}/.local/share/ia-agent-usage"
-CONFIG_DIR="${HOME}/.config/ia-agent-usage"
+INSTALL_DIR="${HOME}/.local/share/ai-agent-usage"
+CONFIG_DIR="${HOME}/.config/ai-agent-usage"
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
 
-echo "Installing ia-agent-usage..."
+echo "Installing ai-agent-usage..."
 
 # Create directories
 mkdir -p "$INSTALL_DIR"/{lib,monitors,bin}
@@ -19,17 +19,17 @@ echo "Copying files..."
 cp "$SCRIPT_DIR"/lib/*.sh "$INSTALL_DIR/lib/" 2>/dev/null || true
 cp "$SCRIPT_DIR"/monitors/*.sh "$INSTALL_DIR/monitors/" 2>/dev/null || true
 cp "$SCRIPT_DIR"/{statusline.sh,daemon.sh} "$INSTALL_DIR/" 2>/dev/null || true
-cp "$SCRIPT_DIR/ia-agent-usage.conf" "$CONFIG_DIR/ia-agent-usage.conf" 2>/dev/null || true
+cp "$SCRIPT_DIR/ai-agent-usage.conf" "$CONFIG_DIR/ai-agent-usage.conf" 2>/dev/null || true
 
-# Create wrapper scripts in ~/.local/share/ia-agent-usage/bin
-cat >"$INSTALL_DIR/bin/ia-agent-usage" <<'EOF'
+# Create wrapper scripts in ~/.local/share/ai-agent-usage/bin
+cat >"$INSTALL_DIR/bin/ai-agent-usage" <<'EOF'
 #!/bin/bash
-INSTALL_DIR="${HOME}/.local/share/ia-agent-usage"
-CONFIG_DIR="${HOME}/.config/ia-agent-usage"
+INSTALL_DIR="${HOME}/.local/share/ai-agent-usage"
+CONFIG_DIR="${HOME}/.config/ai-agent-usage"
 
 # Source config
-if [[ -f "$CONFIG_DIR/ia-agent-usage.conf" ]]; then
-  source "$CONFIG_DIR/ia-agent-usage.conf"
+if [[ -f "$CONFIG_DIR/ai-agent-usage.conf" ]]; then
+  source "$CONFIG_DIR/ai-agent-usage.conf"
 fi
 
 # Source libraries
@@ -51,13 +51,13 @@ case "${1:-}" in
     echo "Marked $tool limit as hit. Notification scheduled for next reset."
     ;;
   *)
-    echo "Usage: ia-agent-usage {daemon|mark-limit TOOL}"
+    echo "Usage: ai-agent-usage {daemon|mark-limit TOOL}"
     exit 1
     ;;
 esac
 EOF
 
-chmod +x "$INSTALL_DIR/bin/ia-agent-usage"
+chmod +x "$INSTALL_DIR/bin/ai-agent-usage"
 
 # Set permissions on all scripts
 chmod 755 "$INSTALL_DIR/lib"/*.sh
@@ -95,7 +95,55 @@ fi
 
 # Create symlink in PATH
 mkdir -p "${HOME}/.local/bin"
-ln -sf "$INSTALL_DIR/bin/ia-agent-usage" "${HOME}/.local/bin/ia-agent-usage"
+ln -sf "$INSTALL_DIR/bin/ai-agent-usage" "${HOME}/.local/bin/ai-agent-usage"
+
+# Register daemon as a system service
+install_service() {
+  local os; os="$(uname -s)"
+  if [[ "$os" == "Linux" ]]; then
+    _install_systemd
+  elif [[ "$os" == "Darwin" ]]; then
+    _install_launchd
+  else
+    echo "  Note: auto-start not supported on $os — run: ai-agent-usage daemon &"
+  fi
+}
+
+_install_systemd() {
+  if ! command -v systemctl &>/dev/null; then
+    echo "  systemctl not found — skipping service registration."
+    echo "  Run manually: ai-agent-usage daemon &"
+    return
+  fi
+  local unit_dir="${HOME}/.config/systemd/user"
+  mkdir -p "$unit_dir"
+  cp "$SCRIPT_DIR/service/ai-agent-usage.service" "$unit_dir/ai-agent-usage.service"
+  pkill -f "ai-agent-usage daemon" 2>/dev/null || true
+  systemctl --user daemon-reload
+  systemctl --user enable --now ai-agent-usage || {
+    echo "  Warning: systemctl enable failed (is systemd running as user?)."
+    echo "  Try: loginctl enable-linger $(whoami)"
+  }
+  echo "  systemd user service enabled."
+  echo "  Logs: journalctl --user -u ai-agent-usage -f"
+}
+
+_install_launchd() {
+  local plist_dir="${HOME}/Library/LaunchAgents"
+  local plist_dst="$plist_dir/com.ai-agent-usage.daemon.plist"
+  mkdir -p "$plist_dir" "${HOME}/Library/Logs"
+  sed \
+    -e "s|__INSTALL_DIR__|${INSTALL_DIR}|g" \
+    -e "s|__HOME__|${HOME}|g" \
+    "$SCRIPT_DIR/service/ai-agent-usage.plist" > "$plist_dst"
+  pkill -f "ai-agent-usage daemon" 2>/dev/null || true
+  launchctl unload "$plist_dst" 2>/dev/null || true
+  launchctl load -w "$plist_dst"
+  echo "  launchd agent loaded."
+  echo "  Logs: tail -f ~/Library/Logs/ai-agent-usage.log"
+}
+
+install_service
 
 # Verify installation
 echo ""
@@ -105,6 +153,7 @@ echo "  Config dir: $CONFIG_DIR"
 echo "  Claude Code statusline configured"
 echo ""
 echo "Next steps:"
-echo "  1. Edit $CONFIG_DIR/ia-agent-usage.conf to enable monitors"
-echo "  2. Run: ia-agent-usage daemon &"
-echo "  3. To stop: killall ia-agent-usage"
+echo "  1. Edit $CONFIG_DIR/ai-agent-usage.conf to enable monitors"
+echo "  2. Daemon auto-starts at login (systemd/launchd registered above)"
+echo "  3. To stop: ai-agent-usage daemon --stop"
+echo "  4. Status (Linux): systemctl --user status ai-agent-usage"

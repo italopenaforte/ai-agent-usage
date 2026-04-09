@@ -14,8 +14,8 @@
 
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/.local/share/ia-agent-usage"
-CONFIG_DIR="${HOME}/.config/ia-agent-usage"
+INSTALL_DIR="${HOME}/.local/share/ai-agent-usage"
+CONFIG_DIR="${HOME}/.config/ai-agent-usage"
 OPENCODE_AUTH="${HOME}/.local/share/opencode/auth.json"
 
 # Source libraries
@@ -25,8 +25,8 @@ source "$INSTALL_DIR/lib/log.sh"
 source "$INSTALL_DIR/lib/thresholds.sh"
 
 # Source config
-if [[ -f "$CONFIG_DIR/ia-agent-usage.conf" ]]; then
-    source "$CONFIG_DIR/ia-agent-usage.conf"
+if [[ -f "$CONFIG_DIR/ai-agent-usage.conf" ]]; then
+    source "$CONFIG_DIR/ai-agent-usage.conf"
 fi
 
 POLL_INTERVAL="${POLL_INTERVAL:-300}"

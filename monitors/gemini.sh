@@ -1,7 +1,7 @@
 #!/bin/bash
 # monitors/gemini.sh — Google Gemini CLI usage monitor
 # Google has no API for remaining quota. Strategy:
-# - User runs: ia-agent-usage mark-limit gemini (when they hit the wall)
+# - User runs: ai-agent-usage mark-limit gemini (when they hit the wall)
 # - System stores timestamp and schedules next reset notification for midnight PT
 # - Optional: test with lightweight request to detect limit restoration
 #
@@ -9,8 +9,8 @@
 
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/.local/share/ia-agent-usage"
-CONFIG_DIR="${HOME}/.config/ia-agent-usage"
+INSTALL_DIR="${HOME}/.local/share/ai-agent-usage"
+CONFIG_DIR="${HOME}/.config/ai-agent-usage"
 GEMINI_CREDS="${HOME}/.gemini/oauth_creds.json"
 
 # Source libraries
@@ -20,8 +20,8 @@ source "$INSTALL_DIR/lib/log.sh"
 source "$INSTALL_DIR/lib/thresholds.sh"
 
 # Source config
-if [[ -f "$CONFIG_DIR/ia-agent-usage.conf" ]]; then
-    source "$CONFIG_DIR/ia-agent-usage.conf"
+if [[ -f "$CONFIG_DIR/ai-agent-usage.conf" ]]; then
+    source "$CONFIG_DIR/ai-agent-usage.conf"
 fi
 
 POLL_INTERVAL="${POLL_INTERVAL:-300}"

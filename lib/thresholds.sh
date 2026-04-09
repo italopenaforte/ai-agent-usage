@@ -12,7 +12,7 @@ THRESHOLDS=(50 75 80 90 95 99)
 get_thresholds_state() {
     local tool="$1"
     local tmpdir="${TMPDIR:-/tmp}"
-    local thresholds_file="$tmpdir/ia-agent-usage-thresholds-${tool}-$(id -u)"
+    local thresholds_file="$tmpdir/ai-agent-usage-thresholds-${tool}-$(id -u)"
 
     if [[ -f "$thresholds_file" ]]; then
         cat "$thresholds_file"
@@ -33,7 +33,7 @@ save_thresholds_state() {
     local tool="$1"
     local state="$2"
     local tmpdir="${TMPDIR:-/tmp}"
-    local thresholds_file="$tmpdir/ia-agent-usage-thresholds-${tool}-$(id -u)"
+    local thresholds_file="$tmpdir/ai-agent-usage-thresholds-${tool}-$(id -u)"
 
     # Check for symlink attacks
     if [[ -L "$thresholds_file" ]]; then
