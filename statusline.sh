@@ -6,8 +6,8 @@
 
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/.local/share/ia-agent-usage"
-CONFIG_DIR="${HOME}/.config/ia-agent-usage"
+INSTALL_DIR="${HOME}/.local/share/ai-agent-usage"
+CONFIG_DIR="${HOME}/.config/ai-agent-usage"
 
 # Source libraries
 source "$INSTALL_DIR/lib/state.sh"
