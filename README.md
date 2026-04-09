@@ -1,4 +1,4 @@
-# ia-agent-usage: Multi-Tool AI CLI Usage Monitor
+# ai-agent-usage: Multi-Tool AI CLI Usage Monitor
 
 A unified monitoring system for tracking usage limits across multiple AI coding assistants (Claude Code, Gemini CLI, Crush, OpenCode) with cross-platform notifications and Claude Code statusline integration.
 
@@ -17,19 +17,21 @@ A unified monitoring system for tracking usage limits across multiple AI coding 
 ## Installation
 
 ```bash
-cd /home/darvin/ia-agent-usage
+cd /home/darvin/ai-agent-usage
 bash install.sh
 ```
 
 This will:
-1. Copy files to `~/.local/share/ia-agent-usage`
-2. Copy config to `~/.config/ia-agent-usage`
+1. Copy files to `~/.local/share/ai-agent-usage`
+2. Copy config to `~/.config/ai-agent-usage`
 3. Configure Claude Code statusline hook
-4. Create `~/.local/bin/ia-agent-usage` symlink
+4. Create `~/.local/bin/ai-agent-usage` symlink
+5. **Register daemon as a system service** (systemd on Linux, launchd on macOS)
+6. **Auto-start daemon at login**
 
 ## Configuration
 
-Edit `~/.config/ia-agent-usage/ia-agent-usage.conf`:
+Edit `~/.config/ai-agent-usage/ai-agent-usage.conf`:
 
 ```bash
 # Enable monitors (space-separated)
@@ -42,13 +44,13 @@ POLL_INTERVAL=300
 GEMINI_TZ="America/Los_Angeles"
 
 # Threshold notifications (50, 75, 80, 90, 95, 99)
-# To customize, edit: ~/.local/share/ia-agent-usage/lib/thresholds.sh
+# To customize, edit: ~/.local/share/ai-agent-usage/lib/thresholds.sh
 # Change the THRESHOLDS array
 ```
 
 ### Customizing Thresholds
 
-Edit `~/.local/share/ia-agent-usage/lib/thresholds.sh`:
+Edit `~/.local/share/ai-agent-usage/lib/thresholds.sh`:
 
 ```bash
 # Line 5: Change this array to your preferred thresholds
@@ -60,24 +62,39 @@ THRESHOLDS=(50 75 80 90 95 99)
 
 ## Usage
 
-### Daemon Mode (Background)
+### Daemon Mode (Auto-started via systemd/launchd)
+
+The daemon starts automatically at login and runs in the background (no terminal needed).
 
 ```bash
-# Start daemon
-ia-agent-usage daemon &
+# Check status (Linux)
+systemctl --user status ai-agent-usage
 
-# Check status
-ps aux | grep daemon.sh
+# Check status (macOS)
+launchctl list | grep ia-agent
 
-# Stop daemon
-ia-agent-usage daemon --stop
+# View logs (Linux)
+journalctl --user -u ai-agent-usage -f
+
+# View logs (macOS)
+tail -f ~/Library/Logs/ai-agent-usage.log
+
+# Stop daemon gracefully
+ai-agent-usage daemon --stop
+
+# Restart daemon (Linux)
+systemctl --user restart ai-agent-usage
+
+# Restart daemon (macOS)
+launchctl stop com.ai-agent-usage.daemon
+launchctl start com.ai-agent-usage.daemon
 ```
 
-### One-shot Mode (Cron/Systemd)
+### One-shot Mode (Testing, Cron, Manual)
 
 ```bash
-# Run monitors once and exit
-ia-agent-usage daemon --once
+# Run monitors once and exit (useful for testing or cron jobs)
+ai-agent-usage daemon --once
 ```
 
 ### Manual Limit Marking (Gemini & Manual Tools)
@@ -86,11 +103,11 @@ When you hit a usage limit:
 
 ```bash
 # Mark Gemini limit as hit (scheduled for midnight PT reset notification)
-ia-agent-usage mark-limit gemini
+ai-agent-usage mark-limit gemini
 
 # Mark other tools
-ia-agent-usage mark-limit crush
-ia-agent-usage mark-limit opencode
+ai-agent-usage mark-limit crush
+ai-agent-usage mark-limit opencode
 ```
 
 ### Claude Code Statusline
@@ -148,7 +165,7 @@ Usage: 15% → [reset notification] → warn@50%
 
 - **Data source**: `~/.gemini/oauth_creds.json`
 - **Quota info**: None via API (Google doesn't expose it)
-- **Strategy**: User runs `ia-agent-usage mark-limit gemini` when limit hit
+- **Strategy**: User runs `ai-agent-usage mark-limit gemini` when limit hit
 - **Reset**: Scheduled for midnight Pacific Time (00:00 PT)
 - **Notification**: Fires at reset time
 
@@ -176,16 +193,16 @@ Usage: 15% → [reset notification] → warn@50%
 
 ## Logs
 
-Location: `$TMPDIR/ia-agent-usage-log-<tool>-$(id -u).log`
+Location: `$TMPDIR/ai-agent-usage-log-<tool>-$(id -u).log`
 
 View logs:
 
 ```bash
 # Claude monitor
-tail -f /tmp/ia-agent-usage-log-claude-$(id -u).log
+tail -f /tmp/ai-agent-usage-log-claude-$(id -u).log
 
 # All monitors
-tail -f /tmp/ia-agent-usage-log-*-$(id -u).log
+tail -f /tmp/ai-agent-usage-log-*-$(id -u).log
 ```
 
 ## Uninstall
@@ -194,7 +211,15 @@ tail -f /tmp/ia-agent-usage-log-*-$(id -u).log
 bash uninstall.sh
 ```
 
-Removes all installed files, restores Claude Code settings from backup (if available).
+Completely removes ai-agent-usage:
+
+- **Deregisters daemon service** (systemd or launchd)
+- **Removes installed files** from `~/.local/share/ai-agent-usage` and `~/.config/ai-agent-usage`
+- **Removes symlink** from `~/.local/bin/ai-agent-usage`
+- **Cleans up runtime files** (logs, state files, PID files in `/tmp`)
+- **Restores Claude Code settings** from backup (or removes statusline hook if no backup)
+
+No traces left behind.
 
 ## Troubleshooting
 
@@ -207,14 +232,20 @@ Removes all installed files, restores Claude Code settings from backup (if avail
 ### Daemon not running
 
 ```bash
-# Check if already running
-ps aux | grep daemon.sh
+# Check service status (Linux)
+systemctl --user status ai-agent-usage
 
-# View logs
-tail /tmp/ia-agent-usage-log-daemon-$(id -u).log
+# Check service status (macOS)
+launchctl list | grep ai-agent-usage
 
-# Try one-shot mode
-ia-agent-usage daemon --once
+# View logs (Linux)
+journalctl --user -u ai-agent-usage -f
+
+# View logs (macOS)
+tail -f ~/Library/Logs/ai-agent-usage.log
+
+# Try one-shot mode to test monitors
+ai-agent-usage daemon --once
 ```
 
 ### Monitor not detecting limit reset
@@ -223,10 +254,10 @@ Check state file:
 
 ```bash
 # Claude
-cat /tmp/ia-agent-usage-state-claude-$(id -u)
+cat /tmp/ai-agent-usage-state-claude-$(id -u)
 
 # Gemini (should have "limit_hit|timestamp")
-cat /tmp/ia-agent-usage-state-gemini-$(id -u)
+cat /tmp/ai-agent-usage-state-gemini-$(id -u)
 ```
 
 ### Threshold notifications not firing
@@ -235,16 +266,16 @@ Check threshold tracking:
 
 ```bash
 # View threshold state (50:yes,75:no,...)
-cat /tmp/ia-agent-usage-thresholds-claude-$(id -u)
+cat /tmp/ai-agent-usage-thresholds-claude-$(id -u)
 
 # Reset thresholds manually (will re-fire on next check)
-rm /tmp/ia-agent-usage-thresholds-*-$(id -u)
+rm /tmp/ai-agent-usage-thresholds-*-$(id -u)
 ```
 
 ## Architecture
 
 ```
-~/.local/share/ia-agent-usage/
+~/.local/share/ai-agent-usage/
 ├── lib/
 │   ├── notify.sh      # Cross-platform notifications
 │   ├── state.sh       # Secure state file management
@@ -257,7 +288,7 @@ rm /tmp/ia-agent-usage-thresholds-*-$(id -u)
 ├── statusline.sh      # Claude Code statusline
 ├── daemon.sh          # Orchestrator
 └── bin/
-    └── ia-agent-usage # Wrapper script
+    └── ai-agent-usage # Wrapper script
 ```
 
 ## Environment Variables
@@ -269,9 +300,8 @@ rm /tmp/ia-agent-usage-thresholds-*-$(id -u)
 
 ## Future Enhancements
 
-- Per-threshold alerts (warn at 50%, 80%, 95%)
-- Systemd timer unit auto-generation
-- launchd plist for macOS autostart
+- Per-threshold customization via config (currently hardcoded to 50, 75, 80, 90, 95, 99)
+- Additional monitor providers (e.g., Claude Web)
 - OpenAI streaming billing API support
 - GitHub Copilot quota endpoint (when available)
 
@@ -282,6 +312,6 @@ MIT
 ## Support
 
 For issues, check:
-1. Logs: `/tmp/ia-agent-usage-log-*.log`
-2. State files: `/tmp/ia-agent-usage-state-*`
+1. Logs: `/tmp/ai-agent-usage-log-*.log`
+2. State files: `/tmp/ai-agent-usage-state-*`
 3. Credentials file permissions: `ls -la ~/.claude/.credentials.json`

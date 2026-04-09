@@ -1,23 +1,57 @@
 #!/bin/bash
-# uninstall.sh — Uninstall ia-agent-usage
+# uninstall.sh — Uninstall ai-agent-usage
 
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/.local/share/ia-agent-usage"
-CONFIG_DIR="${HOME}/.config/ia-agent-usage"
+INSTALL_DIR="${HOME}/.local/share/ai-agent-usage"
+CONFIG_DIR="${HOME}/.config/ai-agent-usage"
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
 
-echo "Uninstalling ia-agent-usage..."
+echo "Uninstalling ai-agent-usage..."
 
-# Kill any running daemon
-pkill -f "ia-agent-usage daemon" 2>/dev/null || true
-sleep 1
+# Deregister daemon from system service
+uninstall_service() {
+  local os; os="$(uname -s)"
+  if [[ "$os" == "Linux" ]]; then
+    _uninstall_systemd
+  elif [[ "$os" == "Darwin" ]]; then
+    _uninstall_launchd
+  else
+    pkill -f "ai-agent-usage daemon" 2>/dev/null || true
+  fi
+}
+
+_uninstall_systemd() {
+  local unit_file="${HOME}/.config/systemd/user/ai-agent-usage.service"
+  if command -v systemctl &>/dev/null; then
+    systemctl --user disable --now ai-agent-usage 2>/dev/null || true
+    systemctl --user daemon-reload
+  fi
+  rm -f "$unit_file"
+}
+
+_uninstall_launchd() {
+  local plist_dst="${HOME}/Library/LaunchAgents/com.ai-agent-usage.daemon.plist"
+  if [[ -f "$plist_dst" ]]; then
+    launchctl unload -w "$plist_dst" 2>/dev/null || true
+    rm -f "$plist_dst"
+  fi
+}
+
+uninstall_service
 
 # Remove files
 echo "Removing installed files..."
 rm -rf "$INSTALL_DIR"
 rm -rf "$CONFIG_DIR"
-rm -f "${HOME}/.local/bin/ia-agent-usage"
+rm -f "${HOME}/.local/bin/ai-agent-usage"
+
+# Remove runtime state files from /tmp
+echo "Removing runtime state files..."
+rm -f /tmp/ai-agent-usage-state-*-"$(id -u)"
+rm -f /tmp/ai-agent-usage-thresholds-*-"$(id -u)"
+rm -f /tmp/ai-agent-usage-log-*-"$(id -u)".log
+rm -f /tmp/ai-agent-usage-daemon-"$(id -u)".pid
 
 # Remove Claude Code statusline hook (restore from backup if exists)
 if [[ -f "$CLAUDE_SETTINGS.backup" ]]; then

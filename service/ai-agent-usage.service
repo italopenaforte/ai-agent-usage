@@ -1,0 +1,14 @@
+[Unit]
+Description=ai-agent-usage daemon — AI CLI usage monitor
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/ai-agent-usage/bin/ai-agent-usage daemon
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

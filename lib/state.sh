@@ -6,7 +6,7 @@
 get_state_file() {
   local tool="$1"
   local tmpdir="${TMPDIR:-/tmp}"
-  echo "$tmpdir/ia-agent-usage-state-${tool}-$(id -u)"
+  echo "$tmpdir/ai-agent-usage-state-${tool}-$(id -u)"
 }
 
 # read_state — Read state from a tool's state file

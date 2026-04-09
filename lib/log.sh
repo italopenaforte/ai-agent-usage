@@ -7,7 +7,7 @@ log_message() {
   local tool="$1"
   local message="$2"
   local tmpdir="${TMPDIR:-/tmp}"
-  local log_file="$tmpdir/ia-agent-usage-log-${tool}-$(id -u).log"
+  local log_file="$tmpdir/ai-agent-usage-log-${tool}-$(id -u).log"
 
   # Check for symlink attacks
   if [[ -L "$log_file" ]]; then

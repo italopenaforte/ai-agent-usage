@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**ia-agent-usage** is a unified usage monitoring system for AI CLI tools (Claude Code, Gemini CLI, Crush, OpenCode). It provides:
+**ai-agent-usage** is a unified usage monitoring system for AI CLI tools (Claude Code, Gemini CLI, Crush, OpenCode). It provides:
 - Real-time usage display in Claude Code's statusline
 - Threshold-based notifications (50%, 75%, 80%, 90%, 95%, 99%)
 - Reset detection and notifications
 - Cross-platform support (Linux + macOS)
 - Plugin architecture for extending to new tools
 
-**Not a service**: Runs as user processes, no daemon installation required.
+**Systemd + launchd integration**: Daemon auto-starts at login and runs independently of terminal sessions via systemd user service (Linux) or launchd LaunchAgent (macOS).
 
 ## Architecture
 
@@ -40,7 +40,7 @@ Shared libraries (lib/)
 3. Monitor:
    - Reads credentials from tool's config (OAuth, API keys, or state files)
    - Fetches usage from provider API (or uses manual state for Gemini)
-   - Compares against previous state (in `/tmp/ia-agent-usage-state-<tool>-$(id -u)`)
+   - Compares against previous state (in `/tmp/ai-agent-usage-state-<tool>-$(id -u)`)
    - Detects reset (20%+ drop or resets_at timestamp passed)
    - Checks threshold crossings (50%, 75%, etc.)
    - Sends notifications via `lib/notify.sh`
@@ -66,10 +66,10 @@ Shared libraries (lib/)
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `ia-agent-usage-state-<tool>-$(id -u)` | `percentage\|resets_at_epoch` | Previous usage snapshot |
-| `ia-agent-usage-thresholds-<tool>-$(id -u)` | `50:yes,75:no,...` | Which thresholds have fired |
-| `ia-agent-usage-log-<tool>-$(id -u).log` | Timestamped lines | Debug logs |
-| `ia-agent-usage-daemon-$(id -u).pid` | PID number | Daemon process ID |
+| `ai-agent-usage-state-<tool>-$(id -u)` | `percentage\|resets_at_epoch` | Previous usage snapshot |
+| `ai-agent-usage-thresholds-<tool>-$(id -u)` | `50:yes,75:no,...` | Which thresholds have fired |
+| `ai-agent-usage-log-<tool>-$(id -u).log` | Timestamped lines | Debug logs |
+| `ai-agent-usage-daemon-$(id -u).pid` | PID number | Daemon process ID |
 
 All created with 600 permissions. Symlink attack checks before access.
 
@@ -83,7 +83,7 @@ All created with 600 permissions. Symlink attack checks before access.
 - ~180 LOC
 
 **gemini.sh**: Manual limit + scheduled resets
-- No API available; user calls `ia-agent-usage mark-limit gemini`
+- No API available; user calls `ai-agent-usage mark-limit gemini`
 - Schedules reset notification for **midnight Pacific Time**
 - Emits: reset notification + threshold notifications
 - ~100 LOC
@@ -134,9 +134,9 @@ All created with 600 permissions. Symlink attack checks before access.
 - PID management, trap handling, subshell isolation for crashes
 
 **install.sh**: ~70 LOC
-- Installs to `~/.local/share/ia-agent-usage` + `~/.config`
+- Installs to `~/.local/share/ai-agent-usage` + `~/.config`
 - Configures Claude Code `settings.json` statusline hook
-- Creates `~/.local/bin/ia-agent-usage` wrapper
+- Creates `~/.local/bin/ai-agent-usage` wrapper
 
 ## Development Tasks
 
@@ -144,16 +144,16 @@ All created with 600 permissions. Symlink attack checks before access.
 ```bash
 # Simulate Claude usage at 75%
 export HOME=/home/darvin
-source ~/.local/share/ia-agent-usage/lib/thresholds.sh
-source ~/.local/share/ia-agent-usage/lib/notify.sh
+source ~/.local/share/ai-agent-usage/lib/thresholds.sh
+source ~/.local/share/ai-agent-usage/lib/notify.sh
 check_and_notify_thresholds "claude" "75.0" "Claude Code"
-cat /tmp/ia-agent-usage-thresholds-claude-$(id -u)  # Should show 50:yes,75:yes,...
+cat /tmp/ai-agent-usage-thresholds-claude-$(id -u)  # Should show 50:yes,75:yes,...
 ```
 
 ### Test statusline output
 ```bash
 # Test with mock JSON
-cat <<'EOF' | ~/.local/share/ia-agent-usage/statusline.sh
+cat <<'EOF' | ~/.local/share/ai-agent-usage/statusline.sh
 {
   "model": {"display_name": "Claude Opus"},
   "rate_limits": {
@@ -168,24 +168,24 @@ EOF
 
 ### Test daemon one-shot
 ```bash
-~/.local/share/ia-agent-usage/daemon.sh --once
-tail -5 /tmp/ia-agent-usage-log-claude-$(id -u).log
+~/.local/share/ai-agent-usage/daemon.sh --once
+tail -5 /tmp/ai-agent-usage-log-claude-$(id -u).log
 ```
 
 ### Test a monitor in isolation
 ```bash
-~/.local/share/ia-agent-usage/monitors/claude.sh --once
+~/.local/share/ai-agent-usage/monitors/claude.sh --once
 ```
 
 ### View all logs
 ```bash
-tail -f /tmp/ia-agent-usage-log-*-$(id -u).log
+tail -f /tmp/ai-agent-usage-log-*-$(id -u).log
 ```
 
 ### Check thresholds
 ```bash
 # See which thresholds have fired for each tool
-for f in /tmp/ia-agent-usage-thresholds-*-$(id -u); do
+for f in /tmp/ai-agent-usage-thresholds-*-$(id -u); do
   tool=$(basename "$f" | cut -d- -f4)
   echo "$tool: $(cat "$f")"
 done
@@ -193,13 +193,18 @@ done
 
 ### Install development copy
 ```bash
-cd /home/darvin/ia-agent-usage
-bash install.sh  # Copies all files to ~/.local/share/ia-agent-usage
+cd /home/darvin/ai-agent-usage
+bash install.sh  # Copies all files to ~/.local/share/ai-agent-usage
 ```
 
 ### Reinstall and test
 ```bash
-bash install.sh && ~/.local/share/ia-agent-usage/daemon.sh --once
+bash install.sh
+# Daemon auto-starts via systemd/launchd, check status:
+systemctl --user status ai-agent-usage      # Linux
+launchctl list | grep ia-agent              # macOS
+# Or test immediately with --once:
+ai-agent-usage daemon --once
 ```
 
 ## Adding a New Monitor
@@ -212,7 +217,7 @@ bash install.sh && ~/.local/share/ia-agent-usage/daemon.sh --once
    - Call `check_and_notify_thresholds()` on usage
    - Call `reset_thresholds()` on reset
 
-2. Update `ia-agent-usage.conf`: add to `ENABLED_MONITORS`
+2. Update `ai-agent-usage.conf`: add to `ENABLED_MONITORS`
 
 3. Test: `./monitors/<tool>.sh --once`
 
@@ -244,10 +249,15 @@ See README troubleshooting and security sections for user-facing notes.
 ### Statusline not appearing in Claude Code
 - Check: `cat ~/.claude/settings.json | grep statusLine`
 - Reinstall: `bash install.sh`
-- Test: `cat <<'EOF' | ~/.local/share/ia-agent-usage/statusline.sh`
+- Test: `cat <<'EOF' | ~/.local/share/ai-agent-usage/statusline.sh`
+
+### Daemon not running or crashed
+- Check service status: `systemctl --user status ai-agent-usage` (Linux) or `launchctl list | grep ia-agent` (macOS)
+- Check logs: `journalctl --user -u ai-agent-usage -f` (Linux) or `tail -f ~/Library/Logs/ai-agent-usage.log` (macOS)
+- Run with `--once` for immediate output: `ai-agent-usage daemon --once`
 
 ### Monitor crashes are silent
-- Check logs: `tail /tmp/ia-agent-usage-log-<tool>-$(id -u).log`
+- Check logs: `tail /tmp/ai-agent-usage-log-<tool>-$(id -u).log`
 - Run with `--once` for immediate output
 
 ### Credentials permission warning

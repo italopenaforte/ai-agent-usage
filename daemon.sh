@@ -9,9 +9,9 @@
 
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/.local/share/ia-agent-usage"
-CONFIG_DIR="${HOME}/.config/ia-agent-usage"
-PID_FILE="${TMPDIR:-/tmp}/ia-agent-usage-daemon-$(id -u).pid"
+INSTALL_DIR="${HOME}/.local/share/ai-agent-usage"
+CONFIG_DIR="${HOME}/.config/ai-agent-usage"
+PID_FILE="${TMPDIR:-/tmp}/ai-agent-usage-daemon-$(id -u).pid"
 
 # Source libraries
 source "$INSTALL_DIR/lib/state.sh"
@@ -19,8 +19,8 @@ source "$INSTALL_DIR/lib/notify.sh"
 source "$INSTALL_DIR/lib/log.sh"
 
 # Source config
-if [[ -f "$CONFIG_DIR/ia-agent-usage.conf" ]]; then
-    source "$CONFIG_DIR/ia-agent-usage.conf"
+if [[ -f "$CONFIG_DIR/ai-agent-usage.conf" ]]; then
+    source "$CONFIG_DIR/ai-agent-usage.conf"
 else
     # Defaults
     ENABLED_MONITORS="claude"
