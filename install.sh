@@ -74,7 +74,7 @@ if [[ -f "$CLAUDE_SETTINGS" ]]; then
 
   # Update statusline config (using jq if available, else manual)
   if command -v jq &>/dev/null; then
-    jq ".statusLine.command = \"$statusline_path\"" "$CLAUDE_SETTINGS" >"$CLAUDE_SETTINGS.tmp"
+    jq ".statusLine.type = \"command\" | .statusLine.command = \"$statusline_path\"" "$CLAUDE_SETTINGS" >"$CLAUDE_SETTINGS.tmp"
     mv "$CLAUDE_SETTINGS.tmp" "$CLAUDE_SETTINGS"
   else
     # Manual sed replacement (fallback)
