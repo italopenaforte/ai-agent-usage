@@ -40,9 +40,18 @@ else
     SEVEN_PCT=""
 fi
 
+# Current folder and git branch
+FOLDER=$(basename "$PWD")
+GIT_BRANCH=$(git -C "$PWD" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+if [[ -n "$GIT_BRANCH" && "$GIT_BRANCH" != "HEAD" ]]; then
+    LOCATION="${FOLDER} (${GIT_BRANCH})"
+else
+    LOCATION="$FOLDER"
+fi
+
 # Rate limits not available yet (first message in session)
 if [[ -z "$FIVE_PCT" ]]; then
-    echo "[$MODEL] ctx: ${CTX_PCT}% | usage: waiting..."
+    echo "${LOCATION} | [${MODEL}] ctx: ${CTX_PCT}% | usage: waiting..."
     exit 0
 fi
 
@@ -121,5 +130,5 @@ else
 fi
 
 # Output
-printf "[%s] ${FIVE_COLOR}5h: %s%%${RST} (%s) | ${SEVEN_COLOR}7d: %s%%${RST} | ctx: %s%%${NEXT_WARN}\n" \
-    "$MODEL" "$FIVE_PCT_INT" "$COUNTDOWN" "$SEVEN_PCT_INT" "$CTX_PCT"
+printf "%s | [%s] ${FIVE_COLOR}5h: %s%%${RST} (%s) | ${SEVEN_COLOR}7d: %s%%${RST} | ctx: %s%%${NEXT_WARN}\n" \
+    "$LOCATION" "$MODEL" "$FIVE_PCT_INT" "$COUNTDOWN" "$SEVEN_PCT_INT" "$CTX_PCT"
