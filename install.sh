@@ -14,6 +14,14 @@ echo "Installing ai-agent-usage..."
 mkdir -p "$INSTALL_DIR"/{lib,monitors,bin}
 mkdir -p "$CONFIG_DIR"
 
+# Create secrets.conf with 600 perms if absent (umask 177 → mode 600)
+if [[ ! -f "$CONFIG_DIR/secrets.conf" ]]; then
+  (umask 177; touch "$CONFIG_DIR/secrets.conf")
+  printf '# ai-agent-usage secrets — do not chmod above 600\n' >> "$CONFIG_DIR/secrets.conf"
+  printf '# Format: KEY=value  (no shell syntax, no quotes, no export)\n' >> "$CONFIG_DIR/secrets.conf"
+  printf '# Store keys with: ai-agent-usage set-key ANTHROPIC_API_KEY\n' >> "$CONFIG_DIR/secrets.conf"
+fi
+
 # Copy files
 echo "Copying files..."
 cp "$SCRIPT_DIR"/lib/*.sh "$INSTALL_DIR/lib/" 2>/dev/null || true
@@ -50,8 +58,27 @@ case "${1:-}" in
     log_message "$tool" "Limit marked as hit at $timestamp"
     echo "Marked $tool limit as hit. Notification scheduled for next reset."
     ;;
+  set-key)
+    key_name="${2:-}"
+    if [[ -z "$key_name" ]]; then
+      echo "Usage: ai-agent-usage set-key KEY_NAME" >&2
+      echo "Example: ai-agent-usage set-key ANTHROPIC_API_KEY" >&2
+      exit 1
+    fi
+    source "$INSTALL_DIR/lib/secrets.sh"
+    # -r: no backslash escape  -s: silent (no echo to terminal)
+    printf "Enter value for %s (input hidden): " "$key_name" >&2
+    read -rs key_value
+    echo >&2
+    if [[ -z "$key_value" ]]; then
+      echo "ERROR: Empty value — nothing stored." >&2
+      exit 1
+    fi
+    store_secret "$key_name" "$key_value"
+    unset key_value
+    ;;
   *)
-    echo "Usage: ai-agent-usage {daemon|mark-limit TOOL}"
+    echo "Usage: ai-agent-usage {daemon|mark-limit TOOL|set-key KEY_NAME}"
     exit 1
     ;;
 esac
