@@ -23,6 +23,7 @@ source "$INSTALL_DIR/lib/state.sh"
 source "$INSTALL_DIR/lib/notify.sh"
 source "$INSTALL_DIR/lib/log.sh"
 source "$INSTALL_DIR/lib/thresholds.sh"
+source "$INSTALL_DIR/lib/secrets.sh"
 
 # Source config
 if [[ -f "$CONFIG_DIR/ai-agent-usage.conf" ]]; then
@@ -71,25 +72,25 @@ fetch_copilot_usage() {
 }
 
 fetch_anthropic_via_opencode() {
-    # If OpenCode is using Anthropic provider via $ANTHROPIC_API_KEY
-    if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-        return 1
-    fi
-
-    local response
-    local http_code
-
-    response=$(curl -s -w "\n%{http_code}" --max-time 10 \
-        "https://api.anthropic.com/api/oauth/usage" \
-        --config <(printf 'header = "Authorization: Bearer %s"\n' "$ANTHROPIC_API_KEY") \
-        -H "anthropic-beta: oauth-2025-04-20" \
-        -H "Content-Type: application/json" 2>/dev/null) || {
-        log_message "opencode" "ERROR: Failed to connect to Anthropic API"
+    local api_key
+    api_key=$(read_secret "ANTHROPIC_API_KEY") || {
+        log_message "opencode" "ERROR: ANTHROPIC_API_KEY not found — run: ai-agent-usage set-key ANTHROPIC_API_KEY"
         return 1
     }
 
+    local response http_code body
+    response=$(curl -s -w "\n%{http_code}" --max-time 10 \
+        "https://api.anthropic.com/api/oauth/usage" \
+        --config <(printf 'header = "Authorization: Bearer %s"\n' "$api_key") \
+        -H "anthropic-beta: oauth-2025-04-20" \
+        -H "Content-Type: application/json" 2>/dev/null) || {
+        unset api_key
+        log_message "opencode" "ERROR: Failed to connect to Anthropic API"
+        return 1
+    }
+    unset api_key
+
     http_code=$(echo "$response" | tail -1)
-    local body
     body=$(echo "$response" | sed '$d')
 
     if [[ "$http_code" != "200" ]]; then
@@ -114,7 +115,7 @@ check_and_notify() {
     if [[ "$provider" == "github-copilot" ]]; then
         fetch_copilot_usage || true
 
-    elif [[ "$provider" == "anthropic" ]] || [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    elif [[ "$provider" == "anthropic" ]] || read_secret "ANTHROPIC_API_KEY" >/dev/null 2>&1; then
         local usage
         usage=$(fetch_anthropic_via_opencode) || return 1
 
